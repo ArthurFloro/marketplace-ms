@@ -1,13 +1,68 @@
+import { serviceConfig } from '@/config/gateway.config';
 import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { firstValueFrom } from 'rxjs';
+
+interface UserSession {
+    valid: boolean;
+    user: {
+        id: string
+        email: string
+        firstName: string
+        lastName: string
+        role: string
+        status: string
+    } | null
+}
 
 @Injectable()
 export class AuthService {
     constructor(private readonly jwtService: JwtService, private readonly httpService: HttpService) { }
 
-    validateJwtToken() { }
-    validateSessionToken() { }
-    login() { }
-    register() { }
+    validateJwtToken(token: string): Promise<any> {
+        try {
+            return this.jwtService.verify(token)
+        } catch (error) {
+            throw new UnauthorizedException('Invalid JWT token')
+        }
+    }
+
+    async validateSessionToken(sessionToken: string): Promise<UserSession> {
+        try {
+            const { data } = await firstValueFrom(
+                this.httpService.get<UserSession>(
+                    `${serviceConfig.users.url}/sessions/validate/${sessionToken}`,
+                    { timeout: serviceConfig.users.timeout }
+                )
+            )
+            return data
+        } catch (error) {
+            throw new UnauthorizedException('Invalid session token')
+        }
+    }
+
+    async login(loginDto: { email: string, password: string }) {
+        try {
+            const { data } = await firstValueFrom(
+                this.httpService.post(`${serviceConfig.users.url}/login`, loginDto,
+                    { timeout: serviceConfig.users.timeout })
+            )
+            return data
+        } catch (error) {
+            throw new UnauthorizedException('Invalid credentials')
+        }
+    }
+
+    async register(registerDto: { email: string, password: string, firstName: string, lastName: string, role: string }) {
+        try {
+            const { data } = await firstValueFrom(
+                this.httpService.post(`${serviceConfig.users.url}/auht/register`, registerDto,
+                    { timeout: serviceConfig.users.timeout })
+            )
+            return data
+        } catch (error) {
+            throw new UnauthorizedException('Invalid credentials')
+        }
+    }
 }
